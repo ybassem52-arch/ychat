@@ -7,7 +7,7 @@
     <!-- مكتبات Firebase 9 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCC-FpCXBVV72taHtktK2WA6NElnzvDLF4",
@@ -25,7 +25,6 @@
         window.setDoc = setDoc;
         window.doc = doc;
         window.getDoc = getDoc;
-        window.getDocs = getDocs;
         window.collection = collection;
         window.addDoc = addDoc;
         window.onSnapshot = onSnapshot;
@@ -50,7 +49,7 @@
         .header-actions i { color: #aebac1; font-size: 18px; cursor: pointer; }
         .header-actions i:hover { color: #00a884; }
         
-        /* شاشة تسجيل الدخول والـ Login بالـ ID */
+        /* شاشة تسجيل الدخول */
         .login-wrapper { padding: 30px 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; text-align: center; background: #111b21; overflow-y: auto; }
         .login-logo-big { width: 80px; height: 80px; background: #00a884; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 35px; color: white; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,168,132,0.4); }
         .login-wrapper h2 { color: #e9edef; margin-bottom: 8px; font-size: 24px; }
@@ -70,12 +69,6 @@
         .search-box i { color: #8696a0; font-size: 14px; }
 
         .chats-list { flex: 1; overflow-y: auto; background: #111b21; }
-        .chat-item { display: flex; align-items: center; padding: 12px 16px; gap: 15px; cursor: pointer; border-bottom: 1px solid #222d34; transition: 0.2s; }
-        .chat-item:hover { background: #202c33; }
-        .chat-info { flex: 1; overflow: hidden; }
-        .chat-name-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .chat-name { font-weight: 600; font-size: 16px; color: #e9edef; }
-        .chat-preview { font-size: 13px; color: #8696a0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
         .fab-btn { position: absolute; bottom: 25px; left: 25px; width: 56px; height: 56px; background: #00a884; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); cursor: pointer; border: none; transition: 0.3s; z-index: 10; }
         .fab-btn:hover { background: #008f72; transform: scale(1.05); }
@@ -110,11 +103,11 @@
 
     <div class="whatsapp-container">
         
-        <!-- 1. شاشة تسجيل الدخول أو اختيار وضع الدخول -->
+        <!-- 1. شاشة تسجيل الدخول -->
         <div id="login-screen" class="screen login-wrapper">
             <div class="login-logo-big"><i class="fa-solid fa-bolt"></i></div>
             <h2>yChat السحابي</h2>
-            <p>تواصل مع أي شخص في العالم عبر رقمك السحابي الفريد (11 رقم)</p>
+            <p>تواصل مع أي شخص عبر رقمك السحابي الفريد (11 رقم)</p>
             
             <div id="signup-form" style="width: 100%;">
                 <input type="text" id="input-name" class="wa-input" placeholder="اسمك الكريم...">
@@ -128,7 +121,7 @@
             </div>
 
             <div id="signin-form" class="hidden" style="width: 100%;">
-                <p style="color: #00a884; font-size: 13px; margin-bottom: 10px;">أدخل الـ 11 رقم الخاص بحسابك لاسترجاعه على أي جهاز:</p>
+                <p style="color: #00a884; font-size: 13px; margin-bottom: 10px;">أدخل الـ 11 رقم الخاص بحسابك لاسترجاعه:</p>
                 <input type="text" id="input-existing-id" class="wa-input" placeholder="010XXXXXXXX" maxlength="11">
                 <button class="wa-btn" onclick="handleExistingLogin()">تسجيل الدخول برقمي 🔓</button>
                 <button class="wa-btn wa-btn-secondary" onclick="toggleAuthMode('signup')">إنشاء حساب جديد</button>
@@ -206,34 +199,22 @@
         let currentTargetId = "";
         let uploadedImageBase64 = "";
 
-        // فحص التخزين المحلي عند فتح الصفحة (Auto-Login عبر السحاب)
+        // فحص سريع جداً ولحظي للـ LocalStorage بدون تعليق الشبكة
         window.addEventListener('DOMContentLoaded', () => {
             const savedId = localStorage.getItem('ychat_user_id');
-            if (savedId) {
-                verifyAndAutoLogin(savedId);
+            const savedName = localStorage.getItem('ychat_user_name');
+            
+            if (savedId && savedName) {
+                currentUser.id = savedId;
+                currentUser.name = savedName;
+                currentUser.bio = localStorage.getItem('ychat_user_bio') || "";
+                currentUser.avatar = localStorage.getItem('ychat_user_avatar') || "";
+
+                document.getElementById('my-generated-phone').innerText = `رقمك: ${savedId}`;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('main-screen').classList.remove('hidden');
             }
         });
-
-        async function verifyAndAutoLogin(id) {
-            try {
-                const userDoc = await window.getDoc(window.doc(window.db, "users", id));
-                if (userDoc.exists()) {
-                    const data = userDoc.data();
-                    currentUser.id = id;
-                    currentUser.name = data.name;
-                    currentUser.bio = data.bio;
-                    currentUser.avatar = data.avatar || "";
-
-                    document.getElementById('my-generated-phone').innerText = `رقمك: ${id}`;
-                    document.getElementById('login-screen').classList.add('hidden');
-                    document.getElementById('main-screen').classList.remove('hidden');
-                } else {
-                    localStorage.removeItem('ychat_user_id');
-                }
-            } catch (e) {
-                console.error("خطأ في التحقق التلقائي:", e);
-            }
-        }
 
         function toggleAuthMode(mode) {
             if (mode === 'login') {
@@ -280,7 +261,15 @@
             currentUser.bio = bio;
             currentUser.avatar = uploadedImageBase64;
 
+            // حفظ فوري في الـ LocalStorage عشان التطبيق يفتح لوحده المرة الجاية
             localStorage.setItem('ychat_user_id', assignedId);
+            localStorage.setItem('ychat_user_name', name);
+            localStorage.setItem('ychat_user_bio', bio);
+            localStorage.setItem('ychat_user_avatar', uploadedImageBase64);
+
+            document.getElementById('my-generated-phone').innerText = `رقمك: ${assignedId}`;
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-screen').classList.remove('hidden');
 
             try {
                 await window.setDoc(window.doc(window.db, "users", assignedId), {
@@ -289,13 +278,8 @@
                     avatar: uploadedImageBase64,
                     lastSeen: new Date()
                 });
-
-                document.getElementById('my-generated-phone').innerText = `رقمك: ${assignedId}`;
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('main-screen').classList.remove('hidden');
             } catch (error) {
-                console.error("خطأ في إنشاء الحساب:", error);
-                alert("حدث خطأ في الاتصال بالسحاب.");
+                console.error("خطأ في حفظ المستخدم بالسحاب:", error);
             }
         }
 
@@ -312,10 +296,13 @@
                     const data = userDoc.data();
                     currentUser.id = id;
                     currentUser.name = data.name;
-                    currentUser.bio = data.bio;
+                    currentUser.bio = data.bio || "";
                     currentUser.avatar = data.avatar || "";
 
                     localStorage.setItem('ychat_user_id', id);
+                    localStorage.setItem('ychat_user_name', data.name);
+                    localStorage.setItem('ychat_user_bio', data.bio || "");
+                    localStorage.setItem('ychat_user_avatar', data.avatar || "");
 
                     document.getElementById('my-generated-phone').innerText = `رقمك: ${id}`;
                     document.getElementById('login-screen').classList.add('hidden');
@@ -325,11 +312,12 @@
                 }
             } catch (e) {
                 console.error("خطأ في تسجيل الدخول:", e);
+                alert("حدث خطأ في الاتصال بالشبكة.");
             }
         }
 
         function logout() {
-            localStorage.removeItem('ychat_user_id');
+            localStorage.clear();
             location.reload();
         }
 
@@ -409,7 +397,6 @@
             const chatId = [currentUser.id, currentTargetId].sort().join('_');
 
             try {
-                // حفظ الرسالة في السحاب لتسمع في كل الأجهزة لحظياً
                 await window.addDoc(window.collection(window.db, "chats", chatId, "messages"), {
                     sender: currentUser.id,
                     text: text,
@@ -445,7 +432,6 @@
 
             const q = window.query(window.collection(window.db, "chats", chatId, "messages"), window.orderBy("timestamp", "asc"));
             
-            // المزامنة الفورية (Real-time Sync) بين كل الأجهزة
             unsubscribeMessages = window.onSnapshot(q, (snapshot) => {
                 messagesBox.innerHTML = "";
                 if (snapshot.empty) {
