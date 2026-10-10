@@ -48,8 +48,7 @@
 
         .whatsapp-header { background: #202c33; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; height: 60px; border-bottom: 1px solid #222d34; }
         .app-logo { font-size: 20px; font-weight: bold; color: #00a884; display: flex; align-items: center; gap: 8px; }
-        .header-icons { display: flex; gap: 20px; color: #aebac1; font-size: 18px; cursor: pointer; }
-
+        
         /* شاشة تسجيل الدخول */
         .login-wrapper { padding: 30px 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; text-align: center; background: #111b21; overflow-y: auto; }
         .login-logo-big { width: 80px; height: 80px; background: #00a884; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 35px; color: white; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,168,132,0.4); }
@@ -102,14 +101,14 @@
         <div id="login-screen" class="screen login-wrapper">
             <div class="login-logo-big"><i class="fa-solid fa-phone-volume"></i></div>
             <h2>مرحباً بك في yChat</h2>
-            <p>سيتم تخصيص رقم هاتف افتراضي (11 رقم) فريد لك تلقائياً</p>
-            <input type="text" id="input-name" class="wa-input" placeholder="اسمك الكريم (مثلاً: يوسف)">
-            <input type="text" id="input-bio" class="wa-input" placeholder="نبذة عنك (مثلاً: مبرمج yChat)">
+            <p>أنشئ حسابك واحصل على رقم هاتف افتراضي (11 رقم)</p>
+            <input type="text" id="input-name" class="wa-input" placeholder="اسمك (مثلاً: أحمد، محمد...)">
+            <input type="text" id="input-bio" class="wa-input" placeholder="نبذتك الشخصية (اختياري)">
             <label class="file-upload-label" id="upload-label-text">
-                <i class="fa-solid fa-camera"></i> رفع صورة شخصية
+                <i class="fa-solid fa-camera"></i> اختر صورتك الشخصية
                 <input type="file" id="input-image" accept="image/*" style="display: none;">
             </label>
-            <button class="wa-btn" onclick="handleLogin()">إنشاء رقمي والبدء 🚀</button>
+            <button class="wa-btn" onclick="handleLogin()">دخول التطبيق 🚀</button>
         </div>
 
         <!-- 2. الشاشة الرئيسية (Chats) -->
@@ -194,38 +193,31 @@
             }
         });
 
-        // توليد رقم 11 رقم عشوائي غير مكرر
-        async function generateUnique11DigitId() {
-            let uniqueId = "";
-            let exists = true;
-            
-            while (exists) {
-                let randomPart = Math.floor(10000000 + Math.random() * 90000000);
-                uniqueId = "010" + randomPart;
-
-                const docCheck = await window.getDoc(window.doc(window.db, "users", uniqueId));
-                if (!docCheck.exists()) {
-                    exists = false;
-                }
-            }
-            return uniqueId;
+        function generateUnique11DigitId() {
+            let randomPart = Math.floor(10000000 + Math.random() * 90000000);
+            return "010" + randomPart;
         }
 
         async function handleLogin() {
             const name = document.getElementById('input-name').value.trim();
-            const bio = document.getElementById('input-bio').value.trim() || "متصل الآن على yChat";
+            // لو المستخدم مسابش نبذة، بنحط نبذة افتراضية عامة جداً (مش تخصك أنت لوحدك)
+            const bio = document.getElementById('input-bio').value.trim() || "متاح للدردشة على yChat";
 
             if (!name) {
                 alert("من فضلك أدخل اسمك على الأقل!");
                 return;
             }
 
-            const assignedId = await generateUnique11DigitId();
+            const assignedId = generateUnique11DigitId();
 
             currentUser.id = assignedId;
             currentUser.name = name;
             currentUser.bio = bio;
             currentUser.avatar = uploadedImageBase64;
+
+            document.getElementById('my-generated-phone').innerText = `رقمك: ${assignedId}`;
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-screen').classList.remove('hidden');
 
             try {
                 await window.setDoc(window.doc(window.db, "users", assignedId), {
@@ -234,14 +226,8 @@
                     avatar: uploadedImageBase64,
                     lastSeen: new Date()
                 });
-
-                document.getElementById('my-generated-phone').innerText = `رقمك: ${assignedId}`;
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('main-screen').classList.remove('hidden');
-
             } catch (error) {
-                console.error("خطأ في التسجيل:", error);
-                alert("حدث خطأ في الاتصال بقاعدة البيانات. تأكد من تفعيل قواعد الـ Firestore.");
+                console.error("خطأ أثناء حفظ المستخدم:", error);
             }
         }
 
@@ -264,16 +250,20 @@
                 return;
             }
 
-            const userDoc = await window.getDoc(window.doc(window.db, "users", targetId));
             let targetName = targetId;
             let targetAvatar = "";
 
-            if (userDoc.exists()) {
-                targetName = userDoc.data().name;
-                targetAvatar = userDoc.data().avatar;
-            } else {
-                alert("عذراً، هذا الرقم غير مسجل على شبكة yChat!");
-                return;
+            try {
+                const userDoc = await window.getDoc(window.doc(window.db, "users", targetId));
+                if (userDoc.exists()) {
+                    targetName = userDoc.data().name;
+                    targetAvatar = userDoc.data().avatar;
+                } else {
+                    alert("عذراً، هذا الرقم غير مسجل على شبكة yChat!");
+                    return;
+                }
+            } catch (e) {
+                console.log("خطأ في جلب بيانات الصديق");
             }
 
             currentTargetId = targetId;
