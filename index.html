@@ -7,7 +7,7 @@
     <!-- مكتبات Firebase 9 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, getDocs, where, limit } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCC-FpCXBVV72taHtktK2WA6NElnzvDLF4",
@@ -25,16 +25,12 @@
         window.setDoc = setDoc;
         window.doc = doc;
         window.getDoc = getDoc;
-        window.getDocs = getDocs;
         window.collection = collection;
         window.addDoc = addDoc;
         window.onSnapshot = onSnapshot;
         window.query = query;
-        window.where = where;
-        window.limit = limit;
         window.orderBy = orderBy;
     </script>
-    <!-- FontAwesome الأيقونات -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Helvetica, Arial, sans-serif; }
@@ -49,7 +45,6 @@
         .whatsapp-header { background: #202c33; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; height: 60px; border-bottom: 1px solid #222d34; }
         .app-logo { font-size: 20px; font-weight: bold; color: #00a884; display: flex; align-items: center; gap: 8px; }
         
-        /* شاشة تسجيل الدخول */
         .login-wrapper { padding: 30px 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; text-align: center; background: #111b21; overflow-y: auto; }
         .login-logo-big { width: 80px; height: 80px; background: #00a884; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 35px; color: white; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,168,132,0.4); }
         .login-wrapper h2 { color: #e9edef; margin-bottom: 8px; font-size: 24px; }
@@ -102,7 +97,7 @@
             <div class="login-logo-big"><i class="fa-solid fa-phone-volume"></i></div>
             <h2>مرحباً بك في yChat</h2>
             <p>أنشئ حسابك واحصل على رقم هاتف افتراضي (11 رقم)</p>
-            <input type="text" id="input-name" class="wa-input" placeholder="اسمك (مثلاً: أحمد، محمد...)">
+            <input type="text" id="input-name" class="wa-input" placeholder="اسمك الكريم...">
             <input type="text" id="input-bio" class="wa-input" placeholder="نبذتك الشخصية (اختياري)">
             <label class="file-upload-label" id="upload-label-text">
                 <i class="fa-solid fa-camera"></i> اختر صورتك الشخصية
@@ -128,7 +123,7 @@
             <div class="chats-list" id="chats-list-container">
                 <div style="text-align: center; color: #8696a0; margin-top: 100px; padding: 20px;">
                     <i class="fa-regular fa-comment-dots" style="font-size: 48px; margin-bottom: 10px;"></i><br>
-                    لا توجد محادثات بعد.<br>اضغط على زر الإضافة وأدخل رقم صديقك (11 رقم)!
+                    لا توجد محادثات نشطة.<br>اضغط على زر الإضافة بالأسفل وأدخل رقم صديقك (11 رقم)!
                 </div>
             </div>
 
@@ -187,7 +182,7 @@
                     uploadedImageBase64 = event.target.result;
                     const label = document.getElementById('upload-label-text');
                     label.style.color = "#00a884";
-                    label.innerHTML = `<i class="fa-solid fa-check"></i> تم رفع الصورة بنجاح`;
+                    label.innerHTML = `<i class="fa-solid fa-check"></i> تم اختيار الصورة بنجاح`;
                 };
                 reader.readAsDataURL(file);
             }
@@ -200,7 +195,6 @@
 
         async function handleLogin() {
             const name = document.getElementById('input-name').value.trim();
-            // لو المستخدم مسابش نبذة، بنحط نبذة افتراضية عامة جداً (مش تخصك أنت لوحدك)
             const bio = document.getElementById('input-bio').value.trim() || "متاح للدردشة على yChat";
 
             if (!name) {
@@ -259,7 +253,7 @@
                     targetName = userDoc.data().name;
                     targetAvatar = userDoc.data().avatar;
                 } else {
-                    alert("عذراً، هذا الرقم غير مسجل على شبكة yChat!");
+                    alert("عذراً، هذا الرقم غير مسجل على شبكة yChat! تأكد أن صاحبه قام بتسجيل الدخول أولاً.");
                     return;
                 }
             } catch (e) {
@@ -294,6 +288,7 @@
             const text = document.getElementById('message-input').value.trim();
             if (!text || !currentTargetId) return;
 
+            // توحيد ID الغرفة بين الطرفين بدقة شديدة
             const chatId = [currentUser.id, currentTargetId].sort().join('_');
 
             try {
@@ -312,14 +307,23 @@
             if (e.key === 'Enter') sendMessage();
         }
 
+        let unsubscribeMessages = null;
+
         function loadMessages() {
             const chatId = [currentUser.id, currentTargetId].sort().join('_');
             const messagesBox = document.getElementById('messages-box');
             
+            // إلغاء أي اتصال قديم للاستماع لمنع تكرار الرسائل
+            if (unsubscribeMessages) unsubscribeMessages();
+
             const q = window.query(window.collection(window.db, "chats", chatId, "messages"), window.orderBy("timestamp", "asc"));
             
-            window.onSnapshot(q, (snapshot) => {
+            unsubscribeMessages = window.onSnapshot(q, (snapshot) => {
                 messagesBox.innerHTML = "";
+                if (snapshot.empty) {
+                    messagesBox.innerHTML = `<div style="text-align: center; color: #8696a0; margin-top: 30px; font-size: 13px;">لا توجد رسائل بعد. ابدأ قول سلام! 👋</div>`;
+                    return;
+                }
                 snapshot.forEach((doc) => {
                     const msg = doc.data();
                     const isMyMsg = msg.sender === currentUser.id;
@@ -336,7 +340,7 @@
         }
 
         function startAudioCall() {
-            alert("جاري الاتصال الصوتي بالرقم: " + currentTargetId + " (WiFi Calling عبر WebRTC)...");
+            alert("ميزة المكالمات الصوتية (WiFi Calling) جاري ربطها بالكامل عبر WebRTC يا عظمة!");
         }
     </script>
 </body>
